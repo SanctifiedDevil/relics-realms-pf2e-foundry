@@ -1,0 +1,31 @@
+{
+  "id": "homebrew-hub-pf2e",
+  "title": "Relics & Realms Bazaar - Pathfinder 2e",
+  "description": "Browse and import your homebrew Pathfinder 2e content from Relics & Realms Bazaar directly into Foundry VTT. Supports weapons, armor, equipment, spells, feats, monsters, classes, subclasses, backgrounds, ancestries, heritages, journals, maps/scenes, and audio.",
+  "authors": [
+    {
+      "name": "Relics & Realms"
+    }
+  ],
+  "version": "0.1.0",
+  "compatibility": {
+    "minimum": "11",
+    "verified": "13"
+  },
+  "esmodules": [
+    "scripts/main.js"
+  ],
+  "styles": [
+    "styles/homebrew-hub.css"
+  ],
+  "languages": [
+    {
+      "lang": "en",
+      "name": "English",
+      "path": "lang/en.json"
+    }
+  ],
+  "url": "",
+  "manifest": "",
+  "download": ""
+}
