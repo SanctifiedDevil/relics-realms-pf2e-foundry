@@ -359,6 +359,7 @@ class HHBrowserApp extends Application {
     let counts = {};
     try {
       const mode = this._mode || "mine";
+      const agnosticTypes = ["map", "audio"];
       const countPromises = categories.map(c =>
         c.type === "pack"
           ? HHApi.getPacks({ system: "pf2e", limit: 1 })
@@ -368,7 +369,10 @@ class HHBrowserApp extends Application {
             ? HHApi.getLibrary({ type: c.type, limit: 1 })
                 .then(d => ({ type: c.type, count: d.pagination?.total || 0 }))
                 .catch(() => ({ type: c.type, count: 0 }))
-            : HHApi.getContent({ system: "pf2e", type: c.type, limit: 1, author: "me" })
+            : HHApi.getContent(Object.assign(
+                { type: c.type, limit: 1, author: "me" },
+                agnosticTypes.includes(c.type) ? {} : { system: "pf2e" }
+              ))
                 .then(d => ({ type: c.type, count: d.pagination?.total || 0 }))
                 .catch(() => ({ type: c.type, count: 0 }))
       );
@@ -421,7 +425,11 @@ class HHBrowserApp extends Application {
       if (mode === "library") {
         data = await HHApi.getLibrary(params);
       } else {
-        params.system = "pf2e";
+        // Maps and audio are system-agnostic — don't filter by system
+        const agnosticTypes = ["map", "audio"];
+        if (!agnosticTypes.includes(this._currentType)) {
+          params.system = "pf2e";
+        }
         params.author = "me";
         data = await HHApi.getContent(params);
       }
