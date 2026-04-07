@@ -131,7 +131,7 @@ Hooks.on("ready", () => {
     const li = document.createElement("li");
     const btn = document.createElement("button");
     btn.type = "button";
-    btn.className = "ui-control plain icon fa-solid fa-dragon";
+    btn.className = "ui-control plain";
     btn.setAttribute("data-action", "tab");
     btn.setAttribute("data-tab", "rrb-bazaar-pf2e");
     btn.setAttribute("role", "tab");
@@ -139,7 +139,15 @@ Hooks.on("ready", () => {
     btn.setAttribute("data-group", "primary");
     btn.setAttribute("aria-label", "Relics & Realms Bazaar (PF2e)");
     btn.setAttribute("data-tooltip", "Relics & Realms Bazaar (PF2e)");
-    btn.style.color = "#e74c3c";
+    btn.style.padding = "2px";
+    const img = document.createElement("img");
+    img.src = "modules/homebrew-hub-pf2e/tower-simple.png";
+    img.alt = "Relics & Realms";
+    img.style.width = "24px";
+    img.style.height = "24px";
+    img.style.filter = "brightness(0) invert(1)";
+    img.style.objectFit = "contain";
+    btn.appendChild(img);
 
     btn.addEventListener("click", (e) => {
       e.preventDefault();
