@@ -931,7 +931,7 @@ class HHImporter {
       const compendiumName = game.settings.get(MODULE_ID, "compendiumName");
       let pack = game.packs.get(`world.${compendiumName}`);
       if (!pack) {
-        pack = await CompendiumCollection.createCompendium({
+        pack = await (foundry.documents?.collections?.CompendiumCollection ?? CompendiumCollection).createCompendium({
           name: compendiumName,
           label: "Relics & Realms PF2e Imports",
           type: "Item", system: "pf2e",
@@ -1276,7 +1276,7 @@ class HHImporter {
       const compendiumName = game.settings.get(MODULE_ID, "compendiumName") + "-actors";
       let pack = game.packs.get(`world.${compendiumName}`);
       if (!pack) {
-        pack = await CompendiumCollection.createCompendium({
+        pack = await (foundry.documents?.collections?.CompendiumCollection ?? CompendiumCollection).createCompendium({
           name: compendiumName,
           label: "Relics & Realms PF2e NPC Imports",
           type: "Actor", system: "pf2e",
@@ -1564,14 +1564,14 @@ class HHImporter {
         boosts: this.mapAbilityBoosts(d.ability_boosts || []),
         flaws: d.ability_flaw ? { "0": { value: [d.ability_flaw.substring(0, 3).toLowerCase()] } } : {},
         languages: { value: (d.languages || []).map(l => l.toLowerCase()), custom: "" },
-        additionalLanguages: d.additional_languages ? {
-          count: d.additional_languages.count || 0,
-          value: (d.additional_languages.value || []).map(l => l.toLowerCase()),
-          custom: d.additional_languages.custom || "",
-        } : undefined,
+        additionalLanguages: {
+          count: typeof d.additional_languages === 'number' ? d.additional_languages : 0,
+          value: [],
+          custom: "",
+        },
         vision: d.vision || "normal",
         rarity: d.rarity || "common",
-        traits: this.buildTraitsObject([d.size || "medium", item?.name?.toLowerCase()].filter(Boolean)),
+        traits: this.buildTraitsObject(d.traits || []),
       },
     });
   }
@@ -1588,7 +1588,11 @@ class HHImporter {
       type: "heritage",
       system: {
         description: { value: description },
-        ancestry: ancestryName ? { name: ancestryName } : null,
+        ancestry: ancestryName ? {
+          name: ancestryName,
+          slug: ancestryName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, ''),
+          uuid: "",
+        } : { name: "", slug: "", uuid: "" },
         rarity: d.rarity || "common",
         traits: this.buildTraitsObject(d.traits || []),
       },
@@ -1667,10 +1671,7 @@ class HHImporter {
           medium: rankMap[d.pf2e_medium_armor_rank] ?? 0,
           heavy: rankMap[d.pf2e_heavy_armor_rank] ?? 0,
         },
-        spellcasting: {
-          attack: rankMap[d.pf2e_spell_attack_rank] ?? 0,
-          dc: rankMap[d.pf2e_spell_dc_rank] ?? 0,
-        },
+        spellcasting: rankMap[d.pf2e_spell_attack_rank] ?? 0,
         traits: this.buildTraitsObject([]),
       },
     });
@@ -1757,7 +1758,10 @@ class HHImporter {
         },
         traits: {
           size: { value: size },
-          value: d.pf2e_traits || [],
+          value: (typeof d.pf2e_traits === 'string'
+            ? d.pf2e_traits.split(',').map(t => t.trim()).filter(Boolean)
+            : (d.pf2e_traits || [])
+          ).filter(t => !["common","uncommon","rare","unique"].includes(t.toLowerCase())),
         },
       },
       flags: { [MODULE_ID]: { sourceId: item.id, version: item.version } },
@@ -1769,8 +1773,9 @@ class HHImporter {
   // ════════════════════════════════════════════════════════════════════════
 
   static buildTraitsObject(traitArray) {
+    const rarities = ["common", "uncommon", "rare", "unique"];
     return {
-      value: (traitArray || []).map(t => t.toLowerCase()),
+      value: (traitArray || []).map(t => t.toLowerCase()).filter(t => !rarities.includes(t)),
       custom: "",
     };
   }
