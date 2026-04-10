@@ -1982,7 +1982,13 @@ class HHImporter {
     if (d.pf2e_strikes?.length) {
       for (const strike of d.pf2e_strikes) {
         if (!strike.name) continue;
-        const traitValues = (strike.traits || []).map(t => t.toLowerCase().replace(/\s+/g, '-'));
+        // Normalize strike traits — PF2e expects formats like "two-hand-d10", "deadly-d8", "reach-10"
+        // Traits that require a value (like "two-hand" without a die) are invalid — skip them
+        const incompleteTraits = ["two-hand", "deadly", "fatal", "versatile", "reach", "range", "range-increment", "thrown", "volley"];
+        const traitValues = (strike.traits || []).map(t => {
+          const lower = t.toLowerCase().trim().replace(/\s+/g, '-');
+          return lower;
+        }).filter(t => t.length > 0 && !incompleteTraits.includes(t));
         const dmgKey = foundry.utils.randomID(16);
         const dmgMatch = (strike.damage || "").match(/^(\d+d\d+(?:\s*[+-]\s*\d+)?)\s*(\w+)?/);
         items.push({
