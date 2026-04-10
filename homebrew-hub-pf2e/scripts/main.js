@@ -1579,20 +1579,16 @@ class HHImporter {
   // ── Heritage ──
   static mapHeritage(base, d) {
     let description = base.system?.description?.value || "";
+    const ancestryName = d.parent_ancestry || d.ancestry || null;
+    if (ancestryName) description = `<p><strong>Ancestry:</strong> ${ancestryName}</p>` + description;
     if (d.vision_granted) description += `<p><strong>Vision</strong> ${d.vision_granted}</p>`;
     if (d.granted_ability) description += `<p><strong>Granted Ability</strong> ${d.granted_ability}</p>`;
-
-    const ancestryName = d.parent_ancestry || d.ancestry || null;
 
     return foundry.utils.mergeObject(base, {
       type: "heritage",
       system: {
         description: { value: description },
-        ancestry: ancestryName ? {
-          name: ancestryName,
-          slug: ancestryName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, ''),
-          uuid: "",
-        } : { name: "", slug: "", uuid: "" },
+        ancestry: null,
         rarity: d.rarity || "common",
         traits: this.buildTraitsObject(d.traits || []),
       },
@@ -1756,13 +1752,7 @@ class HHImporter {
           reflex: { value: d.pf2e_reflex ?? 0 },
           will: { value: d.pf2e_will ?? 0 },
         },
-        traits: {
-          size: { value: size },
-          value: (typeof d.pf2e_traits === 'string'
-            ? d.pf2e_traits.split(',').map(t => t.trim()).filter(Boolean)
-            : (d.pf2e_traits || [])
-          ).filter(t => !["common","uncommon","rare","unique"].includes(t.toLowerCase())),
-        },
+        traits: this.buildMonsterTraits(d.pf2e_traits, size),
       },
       flags: { [MODULE_ID]: { sourceId: item.id, version: item.version } },
     };
@@ -1777,6 +1767,30 @@ class HHImporter {
     return {
       value: (traitArray || []).map(t => t.toLowerCase()).filter(t => !rarities.includes(t)),
       custom: "",
+    };
+  }
+
+  static buildMonsterTraits(pf2eTraits, size) {
+    const rarities = ["common", "uncommon", "rare", "unique"];
+    let traitsArray = [];
+    if (typeof pf2eTraits === 'string') {
+      traitsArray = pf2eTraits.split(',').map(t => t.trim().toLowerCase()).filter(Boolean);
+    } else if (Array.isArray(pf2eTraits)) {
+      traitsArray = pf2eTraits.map(t => t.toLowerCase());
+    }
+    // Determine rarity
+    let rarity = "common";
+    for (const r of rarities) {
+      if (traitsArray.includes(r)) { rarity = r; break; }
+    }
+    // Filter out rarity and size from trait values
+    const sizeTraits = ["tiny", "small", "medium", "large", "huge", "gargantuan", "sm", "med", "lg", "grg"];
+    const filteredTraits = traitsArray.filter(t => !rarities.includes(t) && !sizeTraits.includes(t));
+
+    return {
+      value: filteredTraits,
+      rarity: rarity,
+      size: { value: size },
     };
   }
 
