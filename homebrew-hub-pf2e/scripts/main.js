@@ -1639,24 +1639,47 @@ class HHImporter {
 
   // ── Ancestry ──
   static mapAncestry(base, d) {
+    const sizeMap = { tiny: "tiny", small: "sm", medium: "med", large: "lg", huge: "huge", gargantuan: "grg" };
+    const size = sizeMap[d.size?.toLowerCase()] || d.size || "med";
+
+    // Vision: normalize to hyphenated format
+    let vision = d.vision || "normal";
+    if (vision === "low-light vision") vision = "low-light-vision";
+
+    // Traits with rarity
+    const rarities = ["common", "uncommon", "rare", "unique"];
+    const allTraits = (d.traits || []).map(t => t.toLowerCase());
+    const rarity = allTraits.find(t => rarities.includes(t)) || d.rarity || "common";
+    const traitValues = allTraits.filter(t => !rarities.includes(t));
+
+    // Additional language choices (available options, not count)
+    const PF2E_COMMON_LANGUAGES = ["common", "draconic", "dwarven", "elven", "fey", "gnomish", "goblin", "halfling", "jotun", "orcish", "sylvan", "undercommon"];
+
     return foundry.utils.mergeObject(base, {
       type: "ancestry",
       system: {
         description: base.system.description,
         hp: d.hp || 8,
-        size: d.size || "med",
+        size,
         speed: d.speed || 25,
+        hands: 2,
+        reach: 5,
         boosts: this.mapAbilityBoosts(d.ability_boosts || []),
         flaws: d.ability_flaw ? { "0": { value: [d.ability_flaw.substring(0, 3).toLowerCase()] } } : {},
         languages: { value: (d.languages || []).map(l => l.toLowerCase()), custom: "" },
         additionalLanguages: {
           count: typeof d.additional_languages === 'number' ? d.additional_languages : 0,
-          value: [],
+          value: PF2E_COMMON_LANGUAGES.filter(l => !(d.languages || []).map(ll => ll.toLowerCase()).includes(l)),
           custom: "",
         },
-        vision: d.vision || "normal",
-        rarity: d.rarity || "common",
-        traits: this.buildTraitsObject(d.traits || []),
+        vision,
+        traits: {
+          value: traitValues,
+          rarity,
+          otherTags: [],
+        },
+        rules: [],
+        slug: null,
       },
     });
   }
@@ -2058,7 +2081,7 @@ class HHImporter {
     const result = {};
     (boosts || []).forEach((b, i) => {
       if (b.toLowerCase() === "free") {
-        result[String(i)] = { value: [] };
+        result[String(i)] = { value: ["str", "dex", "con", "int", "wis", "cha"] };
       } else {
         result[String(i)] = { value: [b.substring(0, 3).toLowerCase()] };
       }
