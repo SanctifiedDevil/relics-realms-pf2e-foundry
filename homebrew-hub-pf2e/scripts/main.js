@@ -1306,6 +1306,21 @@ class HHImporter {
         }
         results.worldActor = actor;
 
+        // Create embedded strike and ability items
+        if (actor) {
+          try {
+            const oldItems = actor.items.filter(i => i.getFlag(MODULE_ID, "monsterAbility"));
+            if (oldItems.length > 0) {
+              await actor.deleteEmbeddedDocuments("Item", oldItems.map(i => i.id));
+            }
+            const embeddedItems = this.buildPf2eMonsterItems(item.data || {});
+            if (embeddedItems.length > 0) {
+              await actor.createEmbeddedDocuments("Item", embeddedItems);
+              console.log(`HH PF2e | Created ${embeddedItems.length} embedded items on ${item.name}`);
+            }
+          } catch (err) { console.warn("HH PF2e | Failed to create monster items:", err); }
+        }
+
         // Import inventory items onto the actor
         if (actor && inventory.length > 0) {
           for (const invItem of inventory) {
@@ -1681,11 +1696,12 @@ class HHImporter {
       large: "lg", huge: "huge", gargantuan: "grg",
     };
     const size = sizeMap[d.size?.toLowerCase()] ?? "med";
+    const tokenSize = size === "lg" ? 2 : size === "huge" ? 3 : size === "grg" ? 4 : 1;
     const level = d.pf2e_level ?? 1;
 
-    // Build speed: prefer structured fields, fall back to pf2e_speeds string, then simple speed
-    let speedValue;
-    let otherSpeeds = [];
+    // Build speed
+    let speedValue = 25;
+    const otherSpeeds = [];
     if (d.speed_land != null) {
       speedValue = parseInt(d.speed_land) || 25;
       if (d.speed_fly) otherSpeeds.push({ type: "fly", value: parseInt(d.speed_fly) });
@@ -1693,10 +1709,8 @@ class HHImporter {
       if (d.speed_burrow) otherSpeeds.push({ type: "burrow", value: parseInt(d.speed_burrow) });
       if (d.speed_climb) otherSpeeds.push({ type: "climb", value: parseInt(d.speed_climb) });
     } else if (d.pf2e_speeds) {
-      // Parse "25 feet, fly 40 feet, swim 30 feet" style string
       const parts = d.pf2e_speeds.split(",").map(s => s.trim());
-      const firstPart = parts[0];
-      speedValue = parseInt(firstPart) || 25;
+      speedValue = parseInt(parts[0]) || 25;
       for (let i = 1; i < parts.length; i++) {
         const match = parts[i].match(/^(\w+)\s+(\d+)/);
         if (match) otherSpeeds.push({ type: match[1].toLowerCase(), value: parseInt(match[2]) });
@@ -1705,24 +1719,86 @@ class HHImporter {
       speedValue = parseInt(d.speed) || 25;
     }
 
+    // Parse immunities as array of {type, exceptions}
+    const immunities = [];
+    if (d.pf2e_immunities) {
+      const parts = typeof d.pf2e_immunities === 'string'
+        ? d.pf2e_immunities.split(',').map(s => s.trim()).filter(Boolean)
+        : (d.pf2e_immunities || []);
+      parts.forEach(imm => immunities.push({ type: imm.toLowerCase().replace(/\s+/g, '-'), exceptions: [] }));
+    }
+
+    // Parse weaknesses as array of {type, value}
+    const weaknesses = [];
+    if (d.pf2e_weaknesses) {
+      const parts = typeof d.pf2e_weaknesses === 'string'
+        ? d.pf2e_weaknesses.split(',').map(s => s.trim()).filter(Boolean)
+        : (d.pf2e_weaknesses || []);
+      parts.forEach(w => {
+        const match = w.match(/^(.+?)\s+(\d+)$/);
+        if (match) weaknesses.push({ type: match[1].toLowerCase().replace(/\s+/g, '-'), value: parseInt(match[2]) });
+        else weaknesses.push({ type: w.toLowerCase().replace(/\s+/g, '-'), value: 5 });
+      });
+    }
+
+    // Parse resistances
+    const resistances = [];
+    if (d.pf2e_resistances) {
+      const parts = typeof d.pf2e_resistances === 'string'
+        ? d.pf2e_resistances.split(',').map(s => s.trim()).filter(Boolean)
+        : (d.pf2e_resistances || []);
+      parts.forEach(r => {
+        const match = r.match(/^(.+?)\s+(\d+)$/);
+        if (match) resistances.push({ type: match[1].toLowerCase().replace(/\s+/g, '-'), value: parseInt(match[2]) });
+        else resistances.push({ type: r.toLowerCase().replace(/\s+/g, '-'), value: 5 });
+      });
+    }
+
+    // Parse senses
+    const senses = [];
+    const sensesStr = d.senses || '';
+    const senseParts = sensesStr.split(',').map(s => s.trim()).filter(Boolean);
+    senseParts.forEach(s => senses.push({ type: s.toLowerCase().replace(/\s+/g, '-') }));
+
+    // Parse skills as {skillname: {base: N}}
+    const skills = {};
+    if (d.skills) {
+      const skillParts = typeof d.skills === 'string'
+        ? d.skills.split(',').map(s => s.trim()).filter(Boolean)
+        : [];
+      skillParts.forEach(s => {
+        const match = s.match(/^(\w+)\s*\+?(\d+)$/i);
+        if (match) skills[match[1].toLowerCase()] = { base: parseInt(match[2]) };
+      });
+    }
+
+    // Parse languages
+    const languages = [];
+    if (d.languages) {
+      const langParts = typeof d.languages === 'string'
+        ? d.languages.split(',').map(s => s.trim()).filter(Boolean)
+        : (d.languages || []);
+      langParts.forEach(l => languages.push(l.toLowerCase()));
+    }
+
     return {
       name: item.name,
       type: "npc",
-      img: HHApi.resolveImageUrl(item.image_url) || "icons/svg/skull.svg",
+      img: HHApi.resolveImageUrl(item.image_url) || "systems/pf2e/icons/default-icons/npc.svg",
       prototypeToken: {
         name: item.name,
-        displayName: 20,
+        displayName: 0,
         actorLink: false,
         texture: {
-          src: HHApi.resolveImageUrl(d.token_image_url || item.image_url) || "icons/svg/skull.svg",
-          scaleX: 1,
-          scaleY: 1,
+          src: HHApi.resolveImageUrl(d.token_image_url || item.image_url) || "systems/pf2e/icons/default-icons/npc.svg",
+          scaleX: 1, scaleY: 1,
         },
-        width: 1,
-        height: 1,
+        width: tokenSize,
+        height: tokenSize,
         disposition: -1,
-        displayBars: 20,
+        displayBars: 0,
         bar1: { attribute: "attributes.hp" },
+        flags: { pf2e: { linkToActorSize: true, autoscale: true } },
       },
       system: {
         abilities: {
@@ -1734,28 +1810,108 @@ class HHImporter {
           cha: { mod: Math.floor(((d.cha || 10) - 10) / 2) },
         },
         attributes: {
-          ac: { value: d.ac || 10 + level },
-          hp: { value: d.hp || 10, max: d.hp || 10 },
-          speed: { value: speedValue, otherSpeeds: otherSpeeds },
+          ac: { value: d.ac || 10 + level, details: d.ac_source || "" },
+          hp: { value: d.hp || 10, max: d.hp || 10, details: "" },
+          speed: { value: speedValue, otherSpeeds, details: d.speed_special || "" },
           allSaves: { value: "" },
+          immunities,
+          weaknesses,
+          resistances,
         },
         details: {
           level: { value: level },
-          alignment: { value: "" },
+          languages: { value: languages, details: "" },
           publicNotes: item.description || "",
           privateNotes: "",
-          creatureType: d.monster_type || "",
+          blurb: d.monster_type || "",
+          publication: { title: "Relics & Realms", authors: "", license: "", remaster: false },
         },
-        perception: { mod: d.pf2e_perception ?? 0 },
+        perception: { mod: d.pf2e_perception ?? 0, senses, details: "" },
         saves: {
-          fortitude: { value: d.pf2e_fortitude ?? 0 },
-          reflex: { value: d.pf2e_reflex ?? 0 },
-          will: { value: d.pf2e_will ?? 0 },
+          fortitude: { value: d.pf2e_fort ?? d.pf2e_fortitude ?? 0, saveDetail: "" },
+          reflex: { value: d.pf2e_ref ?? d.pf2e_reflex ?? 0, saveDetail: "" },
+          will: { value: d.pf2e_will ?? 0, saveDetail: "" },
         },
+        skills,
         traits: this.buildMonsterTraits(d.pf2e_traits, size),
+        resources: {},
+        initiative: { statistic: "perception" },
       },
       flags: { [MODULE_ID]: { sourceId: item.id, version: item.version } },
     };
+  }
+
+  /** Build embedded melee strike and action items for PF2e monsters */
+  static buildPf2eMonsterItems(d) {
+    const items = [];
+    const flag = { [MODULE_ID]: { monsterAbility: true } };
+
+    // Strikes → type "melee"
+    if (d.pf2e_strikes?.length) {
+      for (const strike of d.pf2e_strikes) {
+        if (!strike.name) continue;
+        const traitValues = (strike.traits || []).map(t => t.toLowerCase().replace(/\s+/g, '-'));
+        const dmgKey = foundry.utils.randomID(16);
+        const dmgMatch = (strike.damage || "").match(/^(\d+d\d+(?:\s*[+-]\s*\d+)?)\s*(\w+)?/);
+        items.push({
+          name: strike.name,
+          type: "melee",
+          img: "systems/pf2e/icons/default-icons/melee.svg",
+          system: {
+            bonus: { value: strike.attack || 0 },
+            damageRolls: dmgMatch ? {
+              [dmgKey]: {
+                damage: dmgMatch[1].replace(/\s/g, ''),
+                damageType: (dmgMatch[2] || "untyped").toLowerCase(),
+                category: null,
+              },
+            } : {},
+            description: { value: "" },
+            traits: { value: traitValues, otherTags: [] },
+            action: "strike",
+            subjectToMAP: true,
+            rules: [],
+            slug: null,
+          },
+          flags: flag,
+        });
+      }
+    }
+
+    // Abilities → type "action"
+    if (d.pf2e_abilities?.length) {
+      for (const ability of d.pf2e_abilities) {
+        if (!ability.name) continue;
+        const actionMap = { "passive": "passive", "free action": "free", "reaction": "reaction", "1 action": "action", "2 actions": "action", "3 actions": "action" };
+        const actionsMap = { "1 action": 1, "2 actions": 2, "3 actions": 3 };
+        const actionType = actionMap[ability.action_cost] || "passive";
+        const actionsValue = actionsMap[ability.action_cost] || null;
+
+        items.push({
+          name: ability.name,
+          type: "action",
+          img: actionType === "passive" ? "systems/pf2e/icons/actions/Passive.webp"
+            : actionType === "free" ? "systems/pf2e/icons/actions/FreeAction.webp"
+            : actionType === "reaction" ? "systems/pf2e/icons/actions/Reaction.webp"
+            : actionsValue === 1 ? "systems/pf2e/icons/actions/OneAction.webp"
+            : actionsValue === 2 ? "systems/pf2e/icons/actions/TwoActions.webp"
+            : actionsValue === 3 ? "systems/pf2e/icons/actions/ThreeActions.webp"
+            : "systems/pf2e/icons/actions/Passive.webp",
+          system: {
+            actionType: { value: actionType },
+            actions: { value: actionsValue },
+            category: "offensive",
+            description: { value: `<p>${ability.description || ""}</p>` },
+            traits: { value: [], otherTags: [] },
+            rules: [],
+            slug: null,
+          },
+          flags: flag,
+        });
+      }
+    }
+
+    return items;
   }
 
   // ════════════════════════════════════════════════════════════════════════
