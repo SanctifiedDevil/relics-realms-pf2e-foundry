@@ -1711,40 +1711,43 @@ class HHImporter {
     // HP: prefer numeric field, fall back to parsing hit_die
     const hp = d.pf2e_hp_per_level || parseInt(d.hit_die?.replace(/\D/g, "")) || 8;
 
-    // Build extended description with spellcasting and skills info
+    // Build description with spellcasting info
     let description = base.system?.description?.value || "";
     if (d.pf2e_spellcasting_tradition) {
-      description += `<p><strong>Spellcasting Tradition</strong> ${d.pf2e_spellcasting_tradition}</p>`;
+      description += `<p><strong>Spellcasting Tradition:</strong> ${d.pf2e_spellcasting_tradition}</p>`;
     }
-    if (d.pf2e_spellcasting_type) {
-      description += `<p><strong>Spellcasting Type</strong> ${d.pf2e_spellcasting_type}</p>`;
-    }
-    if (d.pf2e_trained_skills?.length) {
-      description += `<p><strong>Trained Skills</strong> ${d.pf2e_trained_skills.join(', ')}</p>`;
+    if (d.pf2e_spellcasting_type && d.pf2e_spellcasting_type !== 'none') {
+      description += `<p><strong>Spellcasting Type:</strong> ${d.pf2e_spellcasting_type}</p>`;
     }
     if (d.pf2e_skill_choices?.length) {
-      description += `<p><strong>Skill Choices</strong> ${d.pf2e_skill_choices.join(', ')}</p>`;
+      description += `<p><strong>Skill Choices:</strong> ${d.pf2e_skill_choices.join(', ')}</p>`;
     }
+
+    // Trained skills
+    const trainedSkills = {
+      additional: d.pf2e_skill_training || 0,
+      value: (d.pf2e_trained_skills || []).map(s => s.toLowerCase().replace(/\s+/g, '-')),
+    };
 
     return foundry.utils.mergeObject(base, {
       type: "class",
       system: {
         description: { value: description },
-        keyAbility: { value: keyAbility },
-        rarity: d.pf2e_rarity || "common",
-        hp: hp,
+        keyAbility: { value: keyAbility, selected: null },
+        hp,
         perception: rankMap[d.pf2e_perception_rank] ?? 1,
         savingThrows: {
-          fortitude: rankMap[d.pf2e_fortitude_rank] ?? 1,
-          reflex: rankMap[d.pf2e_reflex_rank] ?? 1,
+          fortitude: rankMap[d.pf2e_fort_rank] ?? rankMap[d.pf2e_fortitude_rank] ?? 1,
+          reflex: rankMap[d.pf2e_ref_rank] ?? rankMap[d.pf2e_reflex_rank] ?? 1,
           will: rankMap[d.pf2e_will_rank] ?? 1,
         },
         classDC: rankMap[d.pf2e_class_dc_rank] ?? 1,
         attacks: {
-          simple: rankMap[d.pf2e_simple_weapons_rank] ?? rankMap[d.pf2e_simple_rank] ?? 0,
-          martial: rankMap[d.pf2e_martial_weapons_rank] ?? rankMap[d.pf2e_martial_rank] ?? 0,
-          advanced: rankMap[d.pf2e_advanced_weapons_rank] ?? rankMap[d.pf2e_advanced_rank] ?? 0,
+          simple: rankMap[d.pf2e_simple_weapons_rank] ?? 0,
+          martial: rankMap[d.pf2e_martial_weapons_rank] ?? 0,
+          advanced: rankMap[d.pf2e_advanced_weapons_rank] ?? 0,
           unarmed: rankMap[d.pf2e_unarmed_rank] ?? 0,
+          other: { name: d.pf2e_other_weapons || "", rank: 0 },
         },
         defenses: {
           unarmored: rankMap[d.pf2e_unarmored_rank] ?? 0,
@@ -1753,7 +1756,18 @@ class HHImporter {
           heavy: rankMap[d.pf2e_heavy_armor_rank] ?? 0,
         },
         spellcasting: rankMap[d.pf2e_spell_attack_rank] ?? 0,
-        traits: this.buildTraitsObject([]),
+        trainedSkills,
+        traits: {
+          rarity: d.pf2e_rarity || "common",
+          otherTags: [],
+        },
+        ancestryFeatLevels: { value: [1, 5, 9, 13, 17] },
+        classFeatLevels: { value: [2, 4, 6, 8, 10, 12, 14, 16, 18, 20] },
+        generalFeatLevels: { value: [3, 7, 11, 15, 19] },
+        skillFeatLevels: { value: [2, 4, 6, 8, 10, 12, 14, 16, 18, 20] },
+        skillIncreaseLevels: { value: [3, 5, 7, 9, 11, 13, 15, 17, 19] },
+        rules: [],
+        slug: null,
       },
     });
   }
