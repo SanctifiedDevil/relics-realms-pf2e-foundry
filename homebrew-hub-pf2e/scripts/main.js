@@ -1141,9 +1141,11 @@ class HHImporter {
       }
     }
 
+    const isV14 = game.release?.generation >= 14;
+
     const sceneData = {
       name: item.name,
-      img: localImagePath,
+      ...(isV14 ? {} : { img: localImagePath }),
       background: { src: localImagePath },
       width: d.map_width || 4000,
       height: d.map_height || 3000,
@@ -1156,9 +1158,20 @@ class HHImporter {
         alpha: d.grid_opacity ?? 0.2,
       },
       darkness: d.darkness_level ?? 0,
-      globalLight: d.has_global_illumination ?? false,
-      tokenVision: d.token_vision ?? true,
-      fogExploration: d.fog_exploration ?? true,
+      ...(isV14 ? {
+        environment: {
+          globalLight: { enabled: d.has_global_illumination ?? false },
+          darknessLevel: d.darkness_level ?? 0,
+        },
+        visibility: {
+          tokenVision: d.token_vision ?? true,
+          fogExploration: d.fog_exploration ?? true,
+        },
+      } : {
+        globalLight: d.has_global_illumination ?? false,
+        tokenVision: d.token_vision ?? true,
+        fogExploration: d.fog_exploration ?? true,
+      }),
       navigation: true,
       walls: d.walls || [],
       lights: d.lights || [],
