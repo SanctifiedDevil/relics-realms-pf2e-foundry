@@ -95,7 +95,7 @@ To publish your own homebrew content:
 
 ## Compatibility
 
-- **Foundry VTT**: v11 - v13
+- **Foundry VTT**: v11 - v14
 - **Game System**: pf2e (Pathfinder Second Edition)
 
 ## Support
