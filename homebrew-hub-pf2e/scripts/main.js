@@ -1392,7 +1392,7 @@ class HHImporter {
     const strikingDice = { "": 1, "striking": 2, "greater striking": 3, "major striking": 4 };
     const dice = strikingDice[d.pf2e_striking_rune || ""] || 1;
     const potency = d.pf2e_potency_rune || 0;
-    const traits = this.buildTraitsObject(d.properties || []);
+    const traits = this.buildTraitsWithRarity(d.properties || [], d.rarity);
 
     const description = (base.system?.description?.value || "") +
       (d.special_effects ? `<p><em>${d.special_effects}</em></p>` : "") +
@@ -1416,7 +1416,6 @@ class HHImporter {
         bulk: { value: this.parseBulk(d.pf2e_bulk) },
         level: { value: d.pf2e_level || 0 },
         price: this.parsePrice(d.pf2e_price_text),
-        rarity: d.rarity || "common",
         traits: traits,
         potencyRune: { value: potency || null },
         strikingRune: { value: d.pf2e_striking_rune || null },
@@ -1434,7 +1433,7 @@ class HHImporter {
   static mapArmor(base, d) {
     const potency = d.pf2e_potency_rune || 0;
     const resilientMap = { "": null, "resilient": "resilient", "greater resilient": "greaterResilient", "major resilient": "majorResilient" };
-    const traits = this.buildTraitsObject(d.traits || []);
+    const traits = this.buildTraitsWithRarity(d.traits || [], d.rarity);
     const groupMap = { "unarmored": "cloth", "light": "leather", "medium": "chain", "heavy": "plate" };
     const isShield = d.group === "shield";
 
@@ -1461,7 +1460,6 @@ class HHImporter {
       bulk: { value: this.parseBulk(d.bulk) },
       level: { value: d.level || 0 },
       price: this.parsePrice(d.price_text),
-      rarity: d.rarity || "common",
       traits: traits,
       potencyRune: { value: potency || null },
       resiliencyRune: { value: resilientMap[d.pf2e_resilient_rune || ""] || null },
@@ -1613,26 +1611,53 @@ class HHImporter {
         bulk: { value: this.parseBulk(d.pf2e_bulk) },
         level: { value: d.pf2e_level || 0 },
         price: this.parsePrice(d.pf2e_price_text),
-        rarity: d.rarity || "common",
-        traits: this.buildTraitsObject(d.pf2e_traits || []),
+        traits: this.buildTraitsWithRarity(d.pf2e_traits || [], d.rarity),
       },
     });
   }
 
   // ── Feat ──
   static mapFeat(base, d) {
-    const actionMap = { "free action": "free", "reaction": "reaction", "1 action": 1, "2 actions": 2, "3 actions": 3 };
+    const actionTypeMap = { "passive": "passive", "free action": "free", "reaction": "reaction", "1 action": "action", "2 actions": "action", "3 actions": "action" };
+    const actionsValueMap = { "1 action": 1, "2 actions": 2, "3 actions": 3 };
+    const actionType = actionTypeMap[d.pf2e_action_cost] || "passive";
+    const actionsValue = actionsValueMap[d.pf2e_action_cost] || null;
+
+    // Category maps from our feat_type to PF2e category
+    const categoryMap = { "ancestry": "ancestry", "class": "class", "general": "general", "skill": "skill", "dedication": "class" };
+    const category = categoryMap[d.pf2e_feat_type] || "bonus";
+
+    // Build description with trigger/requirements/frequency
+    let description = base.system?.description?.value || "";
+    if (d.pf2e_trigger) description = `<p><strong>Trigger</strong> ${d.pf2e_trigger}</p>` + description;
+    if (d.pf2e_requirements) description = `<p><strong>Requirements</strong> ${d.pf2e_requirements}</p>` + description;
+    if (d.pf2e_frequency) description = `<p><strong>Frequency</strong> ${d.pf2e_frequency}</p>` + description;
+
+    // Traits with rarity
+    const rarities = ["common", "uncommon", "rare", "unique"];
+    const allTraits = (d.pf2e_traits || []).map(t => t.toLowerCase());
+    const rarity = allTraits.find(t => rarities.includes(t)) || "common";
+    const traitValues = allTraits.filter(t => !rarities.includes(t));
 
     return foundry.utils.mergeObject(base, {
       type: "feat",
       system: {
-        description: base.system.description,
+        description: { value: description },
         level: { value: d.pf2e_level || 1 },
-        featType: { value: d.pf2e_feat_type || "bonus" },
-        actionType: { value: actionMap[d.pf2e_action_cost] !== undefined ? "action" : "passive" },
-        actions: { value: actionMap[d.pf2e_action_cost] || null },
+        category,
+        actionType: { value: actionType },
+        actions: { value: actionsValue },
         prerequisites: { value: d.prerequisites ? [{ value: d.prerequisites }] : [] },
-        traits: this.buildTraitsObject(d.pf2e_traits || []),
+        traits: {
+          rarity,
+          value: traitValues,
+          otherTags: [],
+        },
+        onlyLevel1: false,
+        maxTakable: 1,
+        location: null,
+        rules: [],
+        slug: null,
       },
     });
   }
@@ -2054,6 +2079,17 @@ class HHImporter {
       value: filteredTraits,
       rarity: rarity,
       size: { value: size },
+    };
+  }
+
+  static buildTraitsWithRarity(traitArray, fallbackRarity) {
+    const rarities = ["common", "uncommon", "rare", "unique"];
+    const allTraits = (traitArray || []).map(t => t.toLowerCase());
+    const rarity = allTraits.find(t => rarities.includes(t)) || fallbackRarity || "common";
+    return {
+      value: allTraits.filter(t => !rarities.includes(t)),
+      rarity,
+      otherTags: [],
     };
   }
 
