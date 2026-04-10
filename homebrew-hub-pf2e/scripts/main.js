@@ -1421,35 +1421,50 @@ class HHImporter {
     const resilientMap = { "": null, "resilient": "resilient", "greater resilient": "greaterResilient", "major resilient": "majorResilient" };
     const traits = this.buildTraitsObject(d.traits || []);
     const groupMap = { "unarmored": "cloth", "light": "leather", "medium": "chain", "heavy": "plate" };
+    const isShield = d.group === "shield";
 
-    const description = (base.system?.description?.value || "") +
+    let description = (base.system?.description?.value || "") +
       (d.special_effects ? `<p><em>${d.special_effects}</em></p>` : "") +
       (d.pf2e_property_runes?.length ? `<p><strong>Property Runes:</strong> ${d.pf2e_property_runes.join(", ")}</p>` : "") +
       (d.pf2e_custom_runes?.length ? `<p><strong>Custom Runes:</strong> ${d.pf2e_custom_runes.map(r => `${r.name}: ${r.effects}`).join("; ")}</p>` : "");
 
+    if (d.activations?.length) {
+      for (const act of d.activations) {
+        description += `<p><strong>Activate</strong> [${act.action_cost}] ${(act.components || []).join(', ')}${act.frequency ? '; <strong>Frequency</strong> ' + act.frequency : ''}${act.trigger ? '; <strong>Trigger</strong> ' + act.trigger : ''}${act.requirements ? '; <strong>Requirements</strong> ' + act.requirements : ''}</p><p><strong>Effect</strong> ${act.description}</p>`;
+      }
+    }
+
+    const systemData = {
+      description: { value: description },
+      category: isShield ? "shield" : (d.group || "light"),
+      group: isShield ? "shield" : (groupMap[d.group] || null),
+      acBonus: d.ac_bonus || 0,
+      dexCap: d.dex_cap ?? 5,
+      checkPenalty: d.check_penalty || 0,
+      speedPenalty: d.speed_penalty || 0,
+      strength: d.strength_threshold || 0,
+      bulk: { value: this.parseBulk(d.bulk) },
+      level: { value: d.level || 0 },
+      price: this.parsePrice(d.price_text),
+      rarity: d.rarity || "common",
+      traits: traits,
+      potencyRune: { value: potency || null },
+      resiliencyRune: { value: resilientMap[d.pf2e_resilient_rune || ""] || null },
+      propertyRune1: { value: d.pf2e_property_runes?.[0] || null },
+      propertyRune2: { value: d.pf2e_property_runes?.[1] || null },
+      propertyRune3: { value: d.pf2e_property_runes?.[2] || null },
+      propertyRune4: { value: d.pf2e_property_runes?.[3] || null },
+    };
+
+    if (isShield) {
+      systemData.hardness = d.hardness || 0;
+      systemData.hp = { value: d.shield_hp || 0, max: d.shield_hp || 0 };
+      systemData.brokenThreshold = d.broken_threshold || 0;
+    }
+
     return foundry.utils.mergeObject(base, {
-      type: "armor",
-      system: {
-        description: { value: description },
-        category: d.group || "light",
-        group: groupMap[d.group] || null,
-        acBonus: d.ac_bonus || 0,
-        dexCap: d.dex_cap ?? 5,
-        checkPenalty: d.check_penalty || 0,
-        speedPenalty: d.speed_penalty || 0,
-        strength: d.strength_threshold || 0,
-        bulk: { value: this.parseBulk(d.bulk) },
-        level: { value: d.level || 0 },
-        price: this.parsePrice(d.price_text),
-        rarity: d.rarity || "common",
-        traits: traits,
-        potencyRune: { value: potency || null },
-        resiliencyRune: { value: resilientMap[d.pf2e_resilient_rune || ""] || null },
-        propertyRune1: { value: d.pf2e_property_runes?.[0] || null },
-        propertyRune2: { value: d.pf2e_property_runes?.[1] || null },
-        propertyRune3: { value: d.pf2e_property_runes?.[2] || null },
-        propertyRune4: { value: d.pf2e_property_runes?.[3] || null },
-      },
+      type: isShield ? "shield" : "armor",
+      system: systemData,
     });
   }
 
@@ -1458,10 +1473,25 @@ class HHImporter {
     const traditions = {};
     (d.traditions || []).forEach(t => traditions[t.toLowerCase()] = true);
 
+    let description = base.system?.description?.value || "";
+    if (d.critical_success) description += `<p><strong>Critical Success</strong> ${d.critical_success}</p>`;
+    if (d.success) description += `<p><strong>Success</strong> ${d.success}</p>`;
+    if (d.failure) description += `<p><strong>Failure</strong> ${d.failure}</p>`;
+    if (d.critical_failure) description += `<p><strong>Critical Failure</strong> ${d.critical_failure}</p>`;
+    if (d.additional_effects) description += `<p>${d.additional_effects}</p>`;
+    if (d.heightened_entries?.length) {
+      description += `<hr/>`;
+      for (const entry of d.heightened_entries) {
+        description += `<p><strong>Heightened (${entry.level})</strong> ${entry.effect}</p>`;
+      }
+    } else if (d.heightening) {
+      description += `<hr/><p><strong>Heightened</strong> ${d.heightening}</p>`;
+    }
+
     return foundry.utils.mergeObject(base, {
       type: "spell",
       system: {
-        description: base.system.description,
+        description: { value: description },
         level: { value: d.pf2e_rank ?? d.level ?? 1 },
         traditions: traditions,
         time: { value: d.pf2e_cast_actions || d.casting_time || "2" },
@@ -1482,10 +1512,19 @@ class HHImporter {
 
   // ── Equipment ──
   static mapEquipment(base, d) {
+    let description = base.system?.description?.value || "";
+    if (d.usage) description += `<p><strong>Usage</strong> ${d.usage}</p>`;
+    if (d.activations?.length) {
+      for (const act of d.activations) {
+        description += `<p><strong>Activate</strong> [${act.action_cost}] ${(act.components || []).join(', ')}${act.frequency ? '; <strong>Frequency</strong> ' + act.frequency : ''}${act.trigger ? '; <strong>Trigger</strong> ' + act.trigger : ''}${act.requirements ? '; <strong>Requirements</strong> ' + act.requirements : ''}</p><p><strong>Effect</strong> ${act.description}</p>`;
+      }
+    }
+    if (d.special_effects) description += `<p>${d.special_effects}</p>`;
+
     return foundry.utils.mergeObject(base, {
       type: "equipment",
       system: {
-        description: base.system.description,
+        description: { value: description },
         bulk: { value: this.parseBulk(d.pf2e_bulk) },
         level: { value: d.pf2e_level || 0 },
         price: this.parsePrice(d.pf2e_price_text),
@@ -1525,7 +1564,13 @@ class HHImporter {
         boosts: this.mapAbilityBoosts(d.ability_boosts || []),
         flaws: d.ability_flaw ? { "0": { value: [d.ability_flaw.substring(0, 3).toLowerCase()] } } : {},
         languages: { value: (d.languages || []).map(l => l.toLowerCase()), custom: "" },
+        additionalLanguages: d.additional_languages ? {
+          count: d.additional_languages.count || 0,
+          value: (d.additional_languages.value || []).map(l => l.toLowerCase()),
+          custom: d.additional_languages.custom || "",
+        } : undefined,
         vision: d.vision || "normal",
+        rarity: d.rarity || "common",
         traits: this.buildTraitsObject([d.size || "medium", item?.name?.toLowerCase()].filter(Boolean)),
       },
     });
@@ -1533,12 +1578,19 @@ class HHImporter {
 
   // ── Heritage ──
   static mapHeritage(base, d) {
+    let description = base.system?.description?.value || "";
+    if (d.vision_granted) description += `<p><strong>Vision</strong> ${d.vision_granted}</p>`;
+    if (d.granted_ability) description += `<p><strong>Granted Ability</strong> ${d.granted_ability}</p>`;
+
+    const ancestryName = d.parent_ancestry || d.ancestry || null;
+
     return foundry.utils.mergeObject(base, {
       type: "heritage",
       system: {
-        description: base.system.description,
-        ancestry: d.ancestry ? { name: d.ancestry } : null,
-        traits: this.buildTraitsObject([]),
+        description: { value: description },
+        ancestry: ancestryName ? { name: ancestryName } : null,
+        rarity: d.rarity || "common",
+        traits: this.buildTraitsObject(d.traits || []),
       },
     });
   }
@@ -1560,12 +1612,42 @@ class HHImporter {
   // ── Class ──
   static mapClass(base, d) {
     const rankMap = { "untrained": 0, "trained": 1, "expert": 2, "master": 3, "legendary": 4 };
+
+    // Key ability: support array (new) or string (old)
+    let keyAbility;
+    if (Array.isArray(d.pf2e_key_ability)) {
+      keyAbility = d.pf2e_key_ability.map(a => a.substring(0, 3).toLowerCase());
+    } else if (d.pf2e_key_ability) {
+      keyAbility = [d.pf2e_key_ability.substring(0, 3).toLowerCase()];
+    } else {
+      keyAbility = ["str"];
+    }
+
+    // HP: prefer numeric field, fall back to parsing hit_die
+    const hp = d.pf2e_hp_per_level || parseInt(d.hit_die?.replace(/\D/g, "")) || 8;
+
+    // Build extended description with spellcasting and skills info
+    let description = base.system?.description?.value || "";
+    if (d.pf2e_spellcasting_tradition) {
+      description += `<p><strong>Spellcasting Tradition</strong> ${d.pf2e_spellcasting_tradition}</p>`;
+    }
+    if (d.pf2e_spellcasting_type) {
+      description += `<p><strong>Spellcasting Type</strong> ${d.pf2e_spellcasting_type}</p>`;
+    }
+    if (d.pf2e_trained_skills?.length) {
+      description += `<p><strong>Trained Skills</strong> ${d.pf2e_trained_skills.join(', ')}</p>`;
+    }
+    if (d.pf2e_skill_choices?.length) {
+      description += `<p><strong>Skill Choices</strong> ${d.pf2e_skill_choices.join(', ')}</p>`;
+    }
+
     return foundry.utils.mergeObject(base, {
       type: "class",
       system: {
-        description: base.system.description,
-        keyAbility: { value: d.pf2e_key_ability ? [d.pf2e_key_ability.substring(0, 3).toLowerCase()] : ["str"] },
-        hp: parseInt(d.hit_die?.replace(/\D/g, "")) || 8,
+        description: { value: description },
+        keyAbility: { value: keyAbility },
+        rarity: d.pf2e_rarity || "common",
+        hp: hp,
         perception: rankMap[d.pf2e_perception_rank] ?? 1,
         savingThrows: {
           fortitude: rankMap[d.pf2e_fortitude_rank] ?? 1,
@@ -1573,6 +1655,22 @@ class HHImporter {
           will: rankMap[d.pf2e_will_rank] ?? 1,
         },
         classDC: rankMap[d.pf2e_class_dc_rank] ?? 1,
+        attacks: {
+          simple: rankMap[d.pf2e_simple_weapons_rank] ?? rankMap[d.pf2e_simple_rank] ?? 0,
+          martial: rankMap[d.pf2e_martial_weapons_rank] ?? rankMap[d.pf2e_martial_rank] ?? 0,
+          advanced: rankMap[d.pf2e_advanced_weapons_rank] ?? rankMap[d.pf2e_advanced_rank] ?? 0,
+          unarmed: rankMap[d.pf2e_unarmed_rank] ?? 0,
+        },
+        defenses: {
+          unarmored: rankMap[d.pf2e_unarmored_rank] ?? 0,
+          light: rankMap[d.pf2e_light_armor_rank] ?? 0,
+          medium: rankMap[d.pf2e_medium_armor_rank] ?? 0,
+          heavy: rankMap[d.pf2e_heavy_armor_rank] ?? 0,
+        },
+        spellcasting: {
+          attack: rankMap[d.pf2e_spell_attack_rank] ?? 0,
+          dc: rankMap[d.pf2e_spell_dc_rank] ?? 0,
+        },
         traits: this.buildTraitsObject([]),
       },
     });
@@ -1586,8 +1684,29 @@ class HHImporter {
       large: "lg", huge: "huge", gargantuan: "grg",
     };
     const size = sizeMap[d.size?.toLowerCase()] ?? "med";
-    const speed = parseInt(d.speed) || 25;
     const level = d.pf2e_level ?? 1;
+
+    // Build speed: prefer structured fields, fall back to pf2e_speeds string, then simple speed
+    let speedValue;
+    let otherSpeeds = [];
+    if (d.speed_land != null) {
+      speedValue = parseInt(d.speed_land) || 25;
+      if (d.speed_fly) otherSpeeds.push({ type: "fly", value: parseInt(d.speed_fly) });
+      if (d.speed_swim) otherSpeeds.push({ type: "swim", value: parseInt(d.speed_swim) });
+      if (d.speed_burrow) otherSpeeds.push({ type: "burrow", value: parseInt(d.speed_burrow) });
+      if (d.speed_climb) otherSpeeds.push({ type: "climb", value: parseInt(d.speed_climb) });
+    } else if (d.pf2e_speeds) {
+      // Parse "25 feet, fly 40 feet, swim 30 feet" style string
+      const parts = d.pf2e_speeds.split(",").map(s => s.trim());
+      const firstPart = parts[0];
+      speedValue = parseInt(firstPart) || 25;
+      for (let i = 1; i < parts.length; i++) {
+        const match = parts[i].match(/^(\w+)\s+(\d+)/);
+        if (match) otherSpeeds.push({ type: match[1].toLowerCase(), value: parseInt(match[2]) });
+      }
+    } else {
+      speedValue = parseInt(d.speed) || 25;
+    }
 
     return {
       name: item.name,
@@ -1620,7 +1739,7 @@ class HHImporter {
         attributes: {
           ac: { value: d.ac || 10 + level },
           hp: { value: d.hp || 10, max: d.hp || 10 },
-          speed: { value: speed },
+          speed: { value: speedValue, otherSpeeds: otherSpeeds },
           allSaves: { value: "" },
         },
         details: {
