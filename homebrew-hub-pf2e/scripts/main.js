@@ -1485,15 +1485,18 @@ class HHImporter {
 
   // ── Spell ──
   static mapSpell(base, d) {
-    const traditions = {};
-    (d.traditions || []).forEach(t => traditions[t.toLowerCase()] = true);
-
-    let description = base.system?.description?.value || "";
-    if (d.critical_success) description += `<p><strong>Critical Success</strong> ${d.critical_success}</p>`;
-    if (d.success) description += `<p><strong>Success</strong> ${d.success}</p>`;
-    if (d.failure) description += `<p><strong>Failure</strong> ${d.failure}</p>`;
-    if (d.critical_failure) description += `<p><strong>Critical Failure</strong> ${d.critical_failure}</p>`;
+    // Build description with degree of success
+    let description = d.spell_description || base.system?.description?.value || "";
+    if (d.critical_success || d.success || d.failure || d.critical_failure) {
+      description += `<hr />`;
+      if (d.critical_success) description += `<p><strong>Critical Success</strong> ${d.critical_success}</p>`;
+      if (d.success) description += `<p><strong>Success</strong> ${d.success}</p>`;
+      if (d.failure) description += `<p><strong>Failure</strong> ${d.failure}</p>`;
+      if (d.critical_failure) description += `<p><strong>Critical Failure</strong> ${d.critical_failure}</p>`;
+    }
     if (d.additional_effects) description += `<p>${d.additional_effects}</p>`;
+
+    // Build heightened description for display
     if (d.heightened_entries?.length) {
       description += `<hr/>`;
       for (const entry of d.heightened_entries) {
@@ -1503,24 +1506,91 @@ class HHImporter {
       description += `<hr/><p><strong>Heightened</strong> ${d.heightening}</p>`;
     }
 
+    // Parse traditions as array
+    const traditions = (d.traditions || []).map(t => t.toLowerCase());
+
+    // Parse traits — filter out rarity
+    const rarities = ["common", "uncommon", "rare", "unique"];
+    const allTraits = (d.pf2e_traits || []).map(t => t.toLowerCase());
+    const rarity = allTraits.find(t => rarities.includes(t)) || "common";
+    const traitValues = allTraits.filter(t => !rarities.includes(t));
+
+    // Parse casting time to just the number
+    let timeValue = d.casting_time || "2";
+    const timeMatch = timeValue.match(/^(\d+)\s*action/i);
+    if (timeMatch) timeValue = timeMatch[1];
+    if (timeValue === "free action") timeValue = "free";
+    if (timeValue === "reaction") timeValue = "reaction";
+
+    // Parse defense
+    let defense = null;
+    if (d.pf2e_defense || d.save_ability) {
+      const save = (d.pf2e_defense || d.save_ability || "").toLowerCase();
+      const isBasic = save.includes("basic");
+      const statistic = save.replace("basic", "").trim().replace(/^(reflex|fortitude|will|ac).*/, "$1");
+      if (statistic === "ac") {
+        defense = null; // AC defense means spell attack, no defense block needed
+      } else if (statistic) {
+        defense = { save: { statistic, basic: isBasic } };
+      }
+    }
+
+    // Build heightening data structure
+    let heighteningData = undefined;
+    if (d.heightened_entries?.length) {
+      const firstEntry = d.heightened_entries[0];
+      if (firstEntry.level?.startsWith('+')) {
+        // Interval type: +1, +2
+        const interval = parseInt(firstEntry.level.replace('+', '')) || 1;
+        const damage = {};
+        // Try to extract dice from each entry's effect text
+        d.heightened_entries.forEach((entry, i) => {
+          const diceMatch = entry.effect?.match(/(\d+d\d+)/);
+          if (diceMatch) damage[String(i)] = diceMatch[1];
+        });
+        heighteningData = { type: "interval", interval, damage: Object.keys(damage).length > 0 ? damage : undefined };
+      } else {
+        // Fixed type: 3rd, 5th, etc.
+        const levels = {};
+        d.heightened_entries.forEach(entry => {
+          const lvlMatch = entry.level?.match(/(\d+)/);
+          if (lvlMatch) levels[lvlMatch[1]] = { description: { value: `<p>${entry.effect}</p>` } };
+        });
+        heighteningData = { type: "fixed", levels };
+      }
+    }
+
     return foundry.utils.mergeObject(base, {
       type: "spell",
       system: {
         description: { value: description },
         level: { value: d.pf2e_rank ?? d.level ?? 1 },
-        traditions: traditions,
-        time: { value: d.pf2e_cast_actions || d.casting_time || "2" },
+        time: { value: timeValue },
         range: { value: d.range || "" },
-        duration: { value: d.duration || "" },
-        defense: d.pf2e_defense ? { save: { statistic: d.pf2e_defense.toLowerCase(), basic: true } } : undefined,
+        target: { value: d.targets || "" },
+        area: d.area ? { value: parseInt(d.area) || null, type: d.area_type || null } : null,
+        duration: { value: d.duration || "", sustained: (d.duration || "").toLowerCase().includes("sustain") },
+        defense,
+        counteraction: d.counteraction ?? false,
         damage: d.damage_formula ? {
           "0": {
             formula: d.damage_formula,
-            type: d.damage_type || "",
+            type: (d.damage_type || "").toLowerCase(),
             kinds: ["damage"],
+            applyMod: false,
+            category: null,
+            materials: [],
           },
         } : undefined,
-        traits: this.buildTraitsObject(d.pf2e_traits || []),
+        heightening: heighteningData,
+        traits: {
+          value: traitValues,
+          rarity,
+          traditions,
+          otherTags: [],
+        },
+        rules: [],
+        slug: null,
       },
     });
   }
