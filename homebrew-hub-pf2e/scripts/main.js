@@ -1144,39 +1144,59 @@ class HHImporter {
     const isV14 = game.release?.generation >= 14;
     console.log(`HH PF2e | Scene import: Foundry v${game.release?.generation}, isV14=${isV14}, imagePath=${localImagePath}`);
 
-    const sceneData = {
-      name: item.name,
-      img: localImagePath,
-      background: { src: localImagePath },
-      width: d.map_width || 4000,
-      height: d.map_height || 3000,
-      padding: d.scene_padding ?? 0.25,
-      backgroundColor: d.background_color || "#000000",
-      grid: {
-        type: d.grid_type ?? 1,
-        size: d.grid_size ?? 100,
-        color: d.grid_color || "#000000",
-        alpha: d.grid_opacity ?? 0.2,
-      },
-      darkness: d.darkness_level ?? 0,
-      globalLight: d.has_global_illumination ?? false,
-      tokenVision: d.token_vision ?? true,
-      fogExploration: d.fog_exploration ?? true,
-      navigation: true,
-      walls: d.walls || [],
-      lights: d.lights || [],
-      sounds: localSounds,
-      flags: { [MODULE_ID]: { sourceId: item.id, version: item.version } },
-    };
+    let sceneData;
 
     if (isV14) {
-      sceneData.environment = {
-        globalLight: { enabled: d.has_global_illumination ?? false },
-        darknessLevel: d.darkness_level ?? 0,
+      sceneData = {
+        name: item.name,
+        width: d.map_width || 4000,
+        height: d.map_height || 3000,
+        padding: d.scene_padding ?? 0.25,
+        backgroundColor: d.background_color || "#000000",
+        grid: {
+          type: d.grid_type ?? 1,
+          size: d.grid_size ?? 100,
+          color: d.grid_color || "#000000",
+          alpha: d.grid_opacity ?? 0.2,
+        },
+        environment: {
+          globalLight: { enabled: d.has_global_illumination ?? false },
+          darknessLevel: d.darkness_level ?? 0,
+        },
+        visibility: {
+          tokenVision: d.token_vision ?? true,
+          fogExploration: d.fog_exploration ?? true,
+        },
+        navigation: true,
+        walls: d.walls || [],
+        lights: d.lights || [],
+        sounds: localSounds,
+        flags: { [MODULE_ID]: { sourceId: item.id, version: item.version } },
       };
-      sceneData.visibility = {
+    } else {
+      sceneData = {
+        name: item.name,
+        img: localImagePath,
+        background: { src: localImagePath },
+        width: d.map_width || 4000,
+        height: d.map_height || 3000,
+        padding: d.scene_padding ?? 0.25,
+        backgroundColor: d.background_color || "#000000",
+        grid: {
+          type: d.grid_type ?? 1,
+          size: d.grid_size ?? 100,
+          color: d.grid_color || "#000000",
+          alpha: d.grid_opacity ?? 0.2,
+        },
+        darkness: d.darkness_level ?? 0,
+        globalLight: d.has_global_illumination ?? false,
         tokenVision: d.token_vision ?? true,
         fogExploration: d.fog_exploration ?? true,
+        navigation: true,
+        walls: d.walls || [],
+        lights: d.lights || [],
+        sounds: localSounds,
+        flags: { [MODULE_ID]: { sourceId: item.id, version: item.version } },
       };
     }
 
@@ -1192,12 +1212,32 @@ class HHImporter {
         ui.notifications.info(`Created scene "${item.name}".`);
       }
 
-      // Ensure background is set (v14 may need explicit update after creation)
+      // Set the background image
       if (results.scene && localImagePath) {
-        const currentBg = results.scene.background?.src;
-        if (!currentBg || currentBg !== localImagePath) {
-          console.log(`HH PF2e | Background not set after create, updating explicitly...`);
-          await results.scene.update({ background: { src: localImagePath }, img: localImagePath });
+        if (isV14) {
+          try {
+            const levels = results.scene.levels?.contents || [];
+            const initialLevel = levels[0];
+            if (initialLevel) {
+              await initialLevel.update({ background: { src: localImagePath } });
+              console.log(`HH PF2e | Set background on initial level: ${localImagePath}`);
+            } else {
+              await results.scene.createEmbeddedDocuments("SceneLevel", [{
+                name: "Ground",
+                elevation: 0,
+                background: { src: localImagePath },
+              }]);
+              console.log(`HH PF2e | Created initial level with background: ${localImagePath}`);
+            }
+          } catch (err) {
+            console.warn("HH PF2e | Failed to set level background, trying legacy fallback:", err);
+            await results.scene.update({ background: { src: localImagePath } });
+          }
+        } else {
+          const currentBg = results.scene.background?.src;
+          if (!currentBg || currentBg !== localImagePath) {
+            await results.scene.update({ background: { src: localImagePath }, img: localImagePath });
+          }
         }
       }
 
