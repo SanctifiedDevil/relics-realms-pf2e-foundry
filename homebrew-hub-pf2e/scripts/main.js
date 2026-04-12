@@ -247,8 +247,8 @@ class HHBrowserApp extends Application {
       id: "homebrew-hub-pf2e-browser",
       title: "Relics & Realms",
       template: "modules/homebrew-hub-pf2e/templates/browser.html",
-      width: 480,
-      height: 650,
+      width: 560,
+      height: 740,
       resizable: true,
     });
   }
@@ -358,21 +358,21 @@ class HHBrowserApp extends Application {
     grid.html(`<div class="rrb-category-loading">Consulting the archives...</div>`);
 
     const categories = [
-      { type: "pack",       label: "Bundles",        icon: "modules/homebrew-hub-pf2e/icons/bundle.png" },
-      { type: "weapon",     label: "Weapons",      icon: "modules/homebrew-hub-pf2e/icons/weapons.png" },
-      { type: "armor",      label: "Armor",        icon: "modules/homebrew-hub-pf2e/icons/armor.png" },
-      { type: "equipment",  label: "Equipment",    icon: "modules/homebrew-hub-pf2e/icons/gear.png" },
-      { type: "spell",      label: "Spells",       icon: "modules/homebrew-hub-pf2e/icons/spell.png" },
+      { type: "pack",       label: "Bundles",        icon: "modules/homebrew-hub-pf2e/icons/bundle.svg" },
+      { type: "weapon",     label: "Weapons",      icon: "modules/homebrew-hub-pf2e/icons/weapons.svg" },
+      { type: "armor",      label: "Armor",        icon: "modules/homebrew-hub-pf2e/icons/armor.svg" },
+      { type: "equipment",  label: "Equipment",    icon: "modules/homebrew-hub-pf2e/icons/equipment.svg" },
+      { type: "spell",      label: "Spells",       icon: "modules/homebrew-hub-pf2e/icons/magic.svg" },
       { type: "feat",       label: "Feats",        icon: "modules/homebrew-hub-pf2e/icons/feats.png" },
-      { type: "monster",    label: "Creatures",    icon: "modules/homebrew-hub-pf2e/icons/monsters.png" },
-      { type: "background", label: "Backgrounds",  icon: "modules/homebrew-hub-pf2e/icons/backgrounds.png" },
+      { type: "monster",    label: "Creatures",    icon: "modules/homebrew-hub-pf2e/icons/creature.svg" },
+      { type: "background", label: "Backgrounds",  icon: "modules/homebrew-hub-pf2e/icons/character.svg" },
       { type: "class",      label: "Classes",      icon: "modules/homebrew-hub-pf2e/icons/classes.png" },
       { type: "subclass",   label: "Subclasses",   icon: "modules/homebrew-hub-pf2e/icons/classes.png" },
       { type: "ancestry",   label: "Ancestries",   icon: "modules/homebrew-hub-pf2e/icons/ancestries.png" },
       { type: "heritage",   label: "Heritages",    icon: "modules/homebrew-hub-pf2e/icons/ancestries.png" },
-      { type: "journal",    label: "Journals",     icon: "modules/homebrew-hub-pf2e/icons/journal.png" },
-      { type: "map",        label: "Maps",         icon: "modules/homebrew-hub-pf2e/icons/maps.png" },
-      { type: "audio",      label: "Audio",        icon: "modules/homebrew-hub-pf2e/icons/audio.png" },
+      { type: "journal",    label: "Journals",     icon: "modules/homebrew-hub-pf2e/icons/journal.svg" },
+      { type: "map",        label: "Maps",         icon: "modules/homebrew-hub-pf2e/icons/treasure-map.svg" },
+      { type: "audio",      label: "Audio",        icon: "modules/homebrew-hub-pf2e/icons/audio.svg" },
     ];
 
     let counts = {};
@@ -410,7 +410,7 @@ class HHBrowserApp extends Application {
       const count = counts[cat.type] || 0;
       html2 += `
         <div class="rrb-cat-card" data-type="${cat.type}" data-label="${cat.label}">
-          <div class="rrb-cat-icon"><img src="${cat.icon}" style="width:1.75rem;height:1.75rem;filter:invert(0.75) sepia(0.3) saturate(1.5) hue-rotate(10deg) brightness(0.9);"></div>
+          <div class="rrb-cat-icon"><img src="${cat.icon}" style="width:1.75rem;height:1.75rem;"></div>
           <div class="rrb-cat-name">${cat.label}</div>
           <div class="rrb-cat-count">${count} item${count !== 1 ? "s" : ""}</div>
         </div>
