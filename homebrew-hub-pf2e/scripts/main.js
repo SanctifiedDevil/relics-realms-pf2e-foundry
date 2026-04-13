@@ -34,6 +34,18 @@ class HHApi {
   static getToken() { return game.settings.get(MODULE_ID, "authToken"); }
 
   /** Resolve an image URL — makes relative proxy paths absolute using the API base URL */
+  static fullImageFor(item) {
+    const full = item && item.data && item.data.full_image_url;
+    return this.resolveImageUrl(full || (item && item.image_url) || "");
+  }
+
+  static fullTokenFor(item) {
+    const d = (item && item.data) || {};
+    return this.resolveImageUrl(
+      d.token_full_image_url || d.token_image_url || (item && item.image_url) || ""
+    );
+  }
+
   static resolveImageUrl(url) {
     if (!url) return "";
     if (url.startsWith("http://") || url.startsWith("https://")) return url;
@@ -977,7 +989,7 @@ class HHImporter {
 
     const journalData = {
       name: item.name,
-      img: HHApi.resolveImageUrl(item.image_url) || null,
+      img: HHApi.fullImageFor(item) || null,
       flags: { [MODULE_ID]: { sourceId: item.id, version: item.version } },
       pages: pages.map((page, idx) => ({
         name: page.title || "Page " + (idx + 1),
@@ -1348,7 +1360,7 @@ class HHImporter {
     const base = {
       name: item.name,
       type: this.mapContentType(item.content_type),
-      img: HHApi.resolveImageUrl(item.image_url) || this.getDefaultIcon(item.content_type),
+      img: HHApi.fullImageFor(item) || this.getDefaultIcon(item.content_type),
       system: { description: { value: item.description || "" } },
       flags: { [MODULE_ID]: { sourceId: item.id, version: item.version } },
     };
@@ -1917,13 +1929,13 @@ class HHImporter {
     return {
       name: item.name,
       type: "npc",
-      img: HHApi.resolveImageUrl(item.image_url) || "systems/pf2e/icons/default-icons/npc.svg",
+      img: HHApi.fullImageFor(item) || "systems/pf2e/icons/default-icons/npc.svg",
       prototypeToken: {
         name: item.name,
         displayName: 0,
         actorLink: false,
         texture: {
-          src: HHApi.resolveImageUrl(d.token_image_url || item.image_url) || "systems/pf2e/icons/default-icons/npc.svg",
+          src: HHApi.fullTokenFor(item) || "systems/pf2e/icons/default-icons/npc.svg",
           scaleX: 1, scaleY: 1,
         },
         width: tokenSize,
