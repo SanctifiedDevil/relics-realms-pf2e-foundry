@@ -7,7 +7,7 @@
       "name": "Relics & Realms"
     }
   ],
-  "version": "0.3.1",
+  "version": "0.3.2",
   "compatibility": {
     "minimum": "11",
     "verified": "14"
@@ -27,5 +27,5 @@
   ],
   "url": "https://github.com/SanctifiedDevil/relics-realms-pf2e-foundry",
   "manifest": "https://github.com/SanctifiedDevil/relics-realms-pf2e-foundry/releases/latest/download/module.json",
-  "download": "https://github.com/SanctifiedDevil/relics-realms-pf2e-foundry/releases/download/v0.3.1/module.zip"
+  "download": "https://github.com/SanctifiedDevil/relics-realms-pf2e-foundry/releases/download/v0.3.2/module.zip"
 }
