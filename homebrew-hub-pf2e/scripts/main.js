@@ -600,12 +600,12 @@ class HHBrowserApp extends Application {
       `;
     } else if (fullItem.content_type === "spell") {
       statsHtml = `
-        ${d.pf2e_rank !== undefined ? `<div class="rrb-stat-row"><span class="rrb-stat-label">Rank</span><span class="rrb-stat-value">${d.pf2e_rank === 0 ? "Cantrip" : d.pf2e_rank}</span></div>` : ""}
+        ${(d.pf2e_rank ?? d.rank) !== undefined ? `<div class="rrb-stat-row"><span class="rrb-stat-label">Rank</span><span class="rrb-stat-value">${(d.pf2e_rank ?? d.rank) === 0 ? "Cantrip" : (d.pf2e_rank ?? d.rank)}</span></div>` : ""}
         ${d.pf2e_cast_actions ? `<div class="rrb-stat-row"><span class="rrb-stat-label">Cast</span><span class="rrb-stat-value">${d.pf2e_cast_actions}</span></div>` : ""}
         ${d.traditions?.length ? `<div class="rrb-stat-row"><span class="rrb-stat-label">Traditions</span><span class="rrb-stat-value">${d.traditions.join(", ")}</span></div>` : ""}
         ${d.range ? `<div class="rrb-stat-row"><span class="rrb-stat-label">Range</span><span class="rrb-stat-value">${d.range}</span></div>` : ""}
         ${d.duration ? `<div class="rrb-stat-row"><span class="rrb-stat-label">Duration</span><span class="rrb-stat-value">${d.duration}</span></div>` : ""}
-        ${d.pf2e_defense ? `<div class="rrb-stat-row"><span class="rrb-stat-label">Defense</span><span class="rrb-stat-value">${d.pf2e_defense}</span></div>` : ""}
+        ${(d.pf2e_defense || d.defense) ? `<div class="rrb-stat-row"><span class="rrb-stat-label">Defense</span><span class="rrb-stat-value">${d.pf2e_defense || d.defense}</span></div>` : ""}
         ${d.damage_formula ? `<div class="rrb-stat-row"><span class="rrb-stat-label">Damage</span><span class="rrb-stat-value">${d.damage_formula} ${d.damage_type || ""}</span></div>` : ""}
       `;
     } else if (fullItem.content_type === "monster") {
@@ -1522,7 +1522,7 @@ class HHImporter {
 
     // Parse traits — filter out rarity
     const rarities = ["common", "uncommon", "rare", "unique"];
-    const allTraits = (d.pf2e_traits || []).map(t => t.toLowerCase());
+    const allTraits = (d.pf2e_traits || d.traits || []).map(t => t.toLowerCase());
     const rarity = allTraits.find(t => rarities.includes(t)) || "common";
     const traitValues = allTraits.filter(t => !rarities.includes(t));
 
@@ -1535,8 +1535,8 @@ class HHImporter {
 
     // Parse defense
     let defense = null;
-    if (d.pf2e_defense || d.save_ability) {
-      const save = (d.pf2e_defense || d.save_ability || "").toLowerCase();
+    if (d.pf2e_defense || d.defense || d.save_ability) {
+      const save = (d.pf2e_defense || d.defense || d.save_ability || "").toLowerCase();
       const isBasic = save.includes("basic");
       const statistic = save.replace("basic", "").trim().replace(/^(reflex|fortitude|will|ac).*/, "$1");
       if (statistic === "ac") {
@@ -1575,7 +1575,7 @@ class HHImporter {
       type: "spell",
       system: {
         description: { value: description },
-        level: { value: d.pf2e_rank ?? d.level ?? 1 },
+        level: { value: d.pf2e_rank ?? d.rank ?? d.level ?? 1 },
         time: { value: timeValue },
         range: { value: d.range || "" },
         target: { value: d.targets || "" },
@@ -1624,7 +1624,7 @@ class HHImporter {
         bulk: { value: this.parseBulk(d.pf2e_bulk) },
         level: { value: d.pf2e_level || 0 },
         price: this.parsePrice(d.pf2e_price_text),
-        traits: this.buildTraitsWithRarity(d.pf2e_traits || [], d.rarity),
+        traits: this.buildTraitsWithRarity(d.pf2e_traits || d.traits || [], d.rarity),
       },
     });
   }
@@ -1648,7 +1648,7 @@ class HHImporter {
 
     // Traits with rarity
     const rarities = ["common", "uncommon", "rare", "unique"];
-    const allTraits = (d.pf2e_traits || []).map(t => t.toLowerCase());
+    const allTraits = (d.pf2e_traits || d.traits || []).map(t => t.toLowerCase());
     const rarity = allTraits.find(t => rarities.includes(t)) || "common";
     const traitValues = allTraits.filter(t => !rarities.includes(t));
 
